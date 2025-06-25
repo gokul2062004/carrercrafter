@@ -32,19 +32,29 @@ namespace CareerCrafter.Controllers
 
             try
             {
-                // ✅ Basic email validation
+                // ✅ Basic email format check
                 if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains("@") || !dto.Email.Contains("."))
                 {
                     _log.Warn($"[Register] Invalid email format: {dto.Email}");
                     return BadRequest("Invalid email format.");
                 }
 
+                // ✅ Password strength check
                 if (string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 6)
                 {
                     _log.Warn("[Register] Weak password");
                     return BadRequest("Password must be at least 6 characters.");
                 }
 
+                // ✅ Role must be either "JobSeeker" or "Employer"
+                var allowedRoles = new[] { "JobSeeker", "Employer" };
+                if (!allowedRoles.Contains(dto.Role))
+                {
+                    _log.Warn($"[Register] Invalid role: {dto.Role}");
+                    return BadRequest("Invalid role. Allowed roles: JobSeeker, Employer.");
+                }
+
+                // ✅ Duplicate email check
                 var existingUser = await _userRepository.GetUserByEmailAsync(dto.Email);
                 if (existingUser != null)
                 {
@@ -52,6 +62,7 @@ namespace CareerCrafter.Controllers
                     return BadRequest("User already exists with this email.");
                 }
 
+                // ✅ Password hashing
                 var passwordHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(dto.Password)));
 
                 var user = new User
