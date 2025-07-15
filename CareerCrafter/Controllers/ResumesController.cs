@@ -29,13 +29,16 @@ namespace CareerCrafter.Controllers
                 var file = dto.ResumeFile;
 
                 if (file == null || file.Length == 0)
+
                     return BadRequest("No file uploaded.");
 
                 if (!file.FileName.EndsWith(".pdf"))
                     return BadRequest("Only PDF files are allowed.");
 
                 int userId = GetCurrentUserId();
-                var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "resumes");
+                var uploadsFolder = Path.Combine(
+                    _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
+                    "resumes");
 
                 if (!Directory.Exists(uploadsFolder))
                     Directory.CreateDirectory(uploadsFolder);
@@ -68,27 +71,29 @@ namespace CareerCrafter.Controllers
 
         [HttpGet]
         [Authorize(Roles = "JobSeeker")]
-        public async Task<IActionResult> GetMyResume()
+        public async Task<IActionResult> GetAllMyResumes()
         {
             try
             {
                 int userId = GetCurrentUserId();
-                var resume = await _resumeRepo.GetLatestResumeByUserIdAsync(userId);
+                var resumes = await _resumeRepo.GetAllResumesByUserIdAsync(userId);
 
-                if (resume == null)
-                    return NotFound("No resume found.");
+                if (resumes == null || !resumes.Any())
+                    return NotFound("No resumes found.");
 
-                return Ok(new
+                var result = resumes.Select(r => new
                 {
-                    resume.Id,
-                    resume.FileName,
-                    resume.UploadedDate,
-                    ResumeLink = $"{Request.Scheme}://{Request.Host}{resume.FilePath}"
+                    r.Id,
+                    r.FileName,
+                    r.UploadedDate,
+                    ResumeLink = $"{Request.Scheme}://{Request.Host}{r.FilePath}"
                 });
+
+                return Ok(result);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error retrieving resume: {ex.Message}");
+                return StatusCode(500, $"Error retrieving resumes: {ex.Message}");
             }
         }
 
@@ -102,11 +107,11 @@ namespace CareerCrafter.Controllers
                 var resume = await _resumeRepo.GetResumeByIdAndUserAsync(id, userId);
 
                 if (resume == null)
-                    return NotFound("Resume not found.");
+                    return NotFound("Resume not found or already deleted.");
 
-                var rootPath = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-
-                await _resumeRepo.DeleteResumeAsync(resume, rootPath);
+                var deleted = await _resumeRepo.SoftDeleteResumeAsync(resume);
+                if (!deleted)
+                    return BadRequest("Resume is already used in job applications and cannot be deleted.");
 
                 return Ok("Resume deleted successfully.");
             }

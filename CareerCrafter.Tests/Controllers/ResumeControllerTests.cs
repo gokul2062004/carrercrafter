@@ -31,7 +31,7 @@ namespace CareerCrafter.Tests.Controllers
 
             _controller = new ResumesController(_resumeRepoMock.Object, _envMock.Object);
 
-            // Simulate authenticated user with ID = 1
+            // Mock user claims (UserId = 1, Role = JobSeeker)
             var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
             {
                 new Claim("UserId", "1"),
@@ -54,7 +54,8 @@ namespace CareerCrafter.Tests.Controllers
             fileMock.Setup(f => f.FileName).Returns(fileName);
             fileMock.Setup(f => f.Length).Returns(ms.Length);
             fileMock.Setup(f => f.OpenReadStream()).Returns(ms);
-            fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), default)).Returns((Stream target, CancellationToken ct) => ms.CopyToAsync(target, ct));
+            fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), default))
+                .Returns((Stream target, CancellationToken ct) => ms.CopyToAsync(target, ct));
 
             var dto = new ResumeDto { ResumeFile = fileMock.Object };
 
@@ -78,35 +79,38 @@ namespace CareerCrafter.Tests.Controllers
         }
 
         [Test]
-        public async Task GetMyResume_Exists_ReturnsOk()
+        public async Task GetAllMyResumes_Exists_ReturnsOk()
         {
-            var resume = new Resume
+            var resumes = new List<Resume>
             {
-                Id = 1,
-                FileName = "resume.pdf",
-                FilePath = "/resumes/resume.pdf",
-                UploadedDate = DateTime.UtcNow
+                new Resume
+                {
+                    Id = 1,
+                    FileName = "resume.pdf",
+                    FilePath = "/resumes/resume.pdf",
+                    UploadedDate = DateTime.UtcNow
+                }
             };
 
-            _resumeRepoMock.Setup(r => r.GetLatestResumeByUserIdAsync(1)).ReturnsAsync(resume);
+            _resumeRepoMock.Setup(r => r.GetAllResumesByUserIdAsync(1)).ReturnsAsync(resumes);
 
-            var result = await _controller.GetMyResume();
+            var result = await _controller.GetAllMyResumes();
 
             Assert.That(result, Is.InstanceOf<OkObjectResult>());
         }
 
         [Test]
-        public async Task GetMyResume_NotFound_ReturnsNotFound()
+        public async Task GetAllMyResumes_Empty_ReturnsNotFound()
         {
-            _resumeRepoMock.Setup(r => r.GetLatestResumeByUserIdAsync(1)).ReturnsAsync((Resume?)null);
+            _resumeRepoMock.Setup(r => r.GetAllResumesByUserIdAsync(1)).ReturnsAsync(new List<Resume>());
 
-            var result = await _controller.GetMyResume();
+            var result = await _controller.GetAllMyResumes();
 
             Assert.That(result, Is.InstanceOf<NotFoundObjectResult>());
         }
 
         [Test]
-        public async Task DeleteResume_Valid_ReturnsOk()
+        public async Task DeleteResume_ValidAndNotUsed_ReturnsOk()
         {
             var resume = new Resume
             {
@@ -116,11 +120,29 @@ namespace CareerCrafter.Tests.Controllers
             };
 
             _resumeRepoMock.Setup(r => r.GetResumeByIdAndUserAsync(1, 1)).ReturnsAsync(resume);
-            _resumeRepoMock.Setup(r => r.DeleteResumeAsync(resume, It.IsAny<string>())).Returns(Task.CompletedTask);
+            _resumeRepoMock.Setup(r => r.SoftDeleteResumeAsync(resume)).ReturnsAsync(true);
 
             var result = await _controller.DeleteResume(1);
 
             Assert.That(result, Is.InstanceOf<OkObjectResult>());
+        }
+
+        [Test]
+        public async Task DeleteResume_UsedInApplication_ReturnsBadRequest()
+        {
+            var resume = new Resume
+            {
+                Id = 1,
+                FilePath = "/resumes/resume.pdf",
+                UserId = 1
+            };
+
+            _resumeRepoMock.Setup(r => r.GetResumeByIdAndUserAsync(1, 1)).ReturnsAsync(resume);
+            _resumeRepoMock.Setup(r => r.SoftDeleteResumeAsync(resume)).ReturnsAsync(false);
+
+            var result = await _controller.DeleteResume(1);
+
+            Assert.That(result, Is.InstanceOf<BadRequestObjectResult>());
         }
 
         [Test]

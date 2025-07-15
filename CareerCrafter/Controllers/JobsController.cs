@@ -17,10 +17,7 @@ namespace CareerCrafter.Controllers
             _jobRepository = jobRepository;
         }
 
-        /// <summary>
-        /// POST: /api/Jobs
-        /// Allows only Employers to post new jobs.
-        /// </summary>
+       
         [HttpPost]
         [Authorize(Roles = "Employer")]
         public async Task<IActionResult> PostJob([FromBody] JobDto jobDto)
@@ -54,10 +51,7 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        /// <summary>
-        /// GET: /api/Jobs
-        /// Open to all users - returns job listings.
-        /// </summary>
+        
         [HttpGet]
         [AllowAnonymous]
         public async Task<IActionResult> GetJobs()
@@ -85,7 +79,7 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // 🔐 Helper method: extract UserId from JWT token
+        
         private int GetCurrentUserId()
         {
             var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId");

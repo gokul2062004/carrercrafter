@@ -1,6 +1,7 @@
 ﻿using CareerCrafter.Data;
 using CareerCrafter.DTOs;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 
 namespace CareerCrafter.Controllers
 {
@@ -15,6 +16,7 @@ namespace CareerCrafter.Controllers
             _context = context;
         }
 
+        // 🔍 POST: /api/Search/jobs
         [HttpPost("jobs")]
         public IActionResult SearchJobs([FromBody] JobSearchDto dto)
         {
@@ -22,18 +24,24 @@ namespace CareerCrafter.Controllers
             {
                 var query = _context.Jobs.AsQueryable();
 
+                // 🔍 Unified search by keyword (Title, Location, CompanyName)
                 if (!string.IsNullOrWhiteSpace(dto.Title))
-                    query = query.Where(j => j.Title.Contains(dto.Title));
+                {
+                    var keyword = dto.Title.ToLower();
+                    query = query.Where(j =>
+                        j.Title.ToLower().Contains(keyword) ||
+                        j.Location.ToLower().Contains(keyword) ||
+                        j.CompanyName.ToLower().Contains(keyword));
+                }
 
-                if (!string.IsNullOrWhiteSpace(dto.Location))
-                    query = query.Where(j => j.Location.Contains(dto.Location));
-
+                // 💰 Optional Salary filters
                 if (dto.MinSalary.HasValue)
-                    query = query.Where(j => j.Salary >= dto.MinSalary);
+                    query = query.Where(j => j.Salary >= dto.MinSalary.Value);
 
                 if (dto.MaxSalary.HasValue)
-                    query = query.Where(j => j.Salary <= dto.MaxSalary);
+                    query = query.Where(j => j.Salary <= dto.MaxSalary.Value);
 
+                // 📄 Convert to list
                 var result = query.ToList();
 
                 return Ok(result);

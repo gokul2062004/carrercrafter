@@ -13,6 +13,11 @@ namespace CareerCrafter.Repositories.Interfaces
         Task<Application?> GetApplicationWithJobAsync(int applicationId, int employerId);
         Task<Application?> GetApplicationByIdAndSeekerAsync(int applicationId, int jobSeekerId);
         Task UpdateStatusAsync(Application application, string status);
+
+        // ✅ Soft delete method
         Task RemoveApplicationAsync(Application application);
+
+        // ✅ Extra method to persist any manual updates
+        Task SaveChangesAsync();
     }
 }

@@ -1,4 +1,5 @@
 ﻿using CareerCrafter.Data;
+using CareerCrafter.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,6 @@ namespace CareerCrafter.Controllers
             _context = context;
         }
 
-        // ✅ GET: /api/JobSeekers/{id}
         [HttpGet("{id}")]
         [Authorize(Roles = "JobSeeker")]
         public IActionResult GetProfile(int id)
@@ -43,11 +43,13 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ PUT: /api/JobSeekers/{id}
         [HttpPut("{id}")]
         [Authorize(Roles = "JobSeeker")]
-        public async Task<IActionResult> UpdateProfile(int id, [FromBody] string newEmail)
+        public async Task<IActionResult> UpdateProfile(int id, [FromBody] UpdateEmailDto dto)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             try
             {
                 if (id != GetCurrentUserId())
@@ -57,7 +59,7 @@ namespace CareerCrafter.Controllers
                 if (user == null || user.Role != "JobSeeker")
                     return NotFound("Job seeker not found.");
 
-                user.Email = newEmail;
+                user.Email = dto.Email;
                 await _context.SaveChangesAsync();
 
                 return Ok("Profile updated successfully.");
@@ -68,7 +70,6 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ DELETE: /api/JobSeekers/{id}
         [HttpDelete("{id}")]
         [Authorize(Roles = "JobSeeker")]
         public async Task<IActionResult> DeleteProfile(int id)
@@ -93,7 +94,6 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ GET: /api/JobSeekers/{id}/applications
         [HttpGet("{id}/applications")]
         [Authorize(Roles = "JobSeeker")]
         public IActionResult GetMyApplications(int id)
@@ -104,15 +104,17 @@ namespace CareerCrafter.Controllers
                     return Forbid("You can only view your own applications.");
 
                 var applications = (from app in _context.Applications
-                                    where app.JobSeekerId == id
+                                    where app.JobSeekerId == id && !app.IsDeleted
                                     join job in _context.Jobs on app.JobId equals job.Id
+                                    join resume in _context.Resumes on app.ResumeId equals resume.Id
                                     select new
                                     {
-                                        app.Id,
-                                        job.Title,
-                                        job.CompanyName,
-                                        app.AppliedDate,
-                                        app.Status
+                                        ApplicationId = app.Id,
+                                        JobTitle = job.Title,
+                                        CompanyName = job.CompanyName,
+                                        AppliedDate = app.AppliedDate,
+                                        Status = app.Status,
+                                        ResumeLink = $"{Request.Scheme}://{Request.Host}{resume.FilePath}"
                                     }).ToList();
 
                 return Ok(applications);
@@ -123,7 +125,6 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ Get user ID from JWT token
         private int GetCurrentUserId()
         {
             var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId");

@@ -19,7 +19,6 @@ namespace CareerCrafter.Controllers
             _jobRepo = jobRepo;
         }
 
-        // ✅ Apply for a job
         [HttpPost]
         [Authorize(Roles = "JobSeeker")]
         public async Task<IActionResult> ApplyForJob([FromBody] ApplicationDto dto)
@@ -29,17 +28,21 @@ namespace CareerCrafter.Controllers
                 int jobSeekerId = GetCurrentUserId();
 
                 var job = await _jobRepo.GetJobByIdAsync(dto.JobId);
-                if (job == null) return NotFound("Job not found.");
+                if (job == null)
+                    return NotFound("Job not found.");
 
                 bool alreadyApplied = await _applicationRepo.HasAlreadyAppliedAsync(jobSeekerId, dto.JobId);
-                if (alreadyApplied) return BadRequest("You have already applied.");
+                if (alreadyApplied)
+                    return BadRequest("You have already applied.");
 
                 var application = new Application
                 {
                     JobId = dto.JobId,
                     JobSeekerId = jobSeekerId,
+                    ResumeId = dto.ResumeId,
                     AppliedDate = DateTime.UtcNow,
-                    Status = "Pending"
+                    Status = "Pending",
+                    IsDeleted = false
                 };
 
                 await _applicationRepo.AddApplicationAsync(application);
@@ -51,7 +54,6 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ View applicants for a job
         [HttpGet("job/{jobId}/applicants")]
         [Authorize(Roles = "Employer")]
         public async Task<IActionResult> GetApplicantsForJob(int jobId)
@@ -72,7 +74,6 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ Update application status
         [HttpPut("{applicationId}/status")]
         [Authorize(Roles = "Employer")]
         public async Task<IActionResult> UpdateStatus(int applicationId, [FromBody] UpdateApplicationStatusDto dto)
@@ -82,7 +83,8 @@ namespace CareerCrafter.Controllers
                 int employerId = GetCurrentUserId();
 
                 var application = await _applicationRepo.GetApplicationWithJobAsync(applicationId, employerId);
-                if (application == null) return NotFound("Not found or access denied.");
+                if (application == null || application.IsDeleted)
+                    return NotFound("Not found or access denied.");
 
                 await _applicationRepo.UpdateStatusAsync(application, dto.Status);
                 return Ok("Application status updated.");
@@ -93,7 +95,6 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ PATCH: reuse PUT logic
         [HttpPatch("{applicationId}/status")]
         [Authorize(Roles = "Employer")]
         public async Task<IActionResult> PatchStatus(int applicationId, [FromBody] UpdateApplicationStatusDto dto)
@@ -101,7 +102,6 @@ namespace CareerCrafter.Controllers
             return await UpdateStatus(applicationId, dto);
         }
 
-        // ✅ Withdraw application
         [HttpDelete("{applicationId}")]
         [Authorize(Roles = "JobSeeker")]
         public async Task<IActionResult> WithdrawApplication(int applicationId)
@@ -111,9 +111,12 @@ namespace CareerCrafter.Controllers
                 int jobSeekerId = GetCurrentUserId();
 
                 var application = await _applicationRepo.GetApplicationByIdAndSeekerAsync(applicationId, jobSeekerId);
-                if (application == null) return NotFound("Application not found or access denied.");
+                if (application == null || application.IsDeleted)
+                    return NotFound("Application not found or access denied.");
 
-                await _applicationRepo.RemoveApplicationAsync(application);
+                application.IsDeleted = true;
+                await _applicationRepo.SaveChangesAsync();
+
                 return Ok("Application withdrawn successfully.");
             }
             catch (Exception ex)
@@ -122,7 +125,6 @@ namespace CareerCrafter.Controllers
             }
         }
 
-        // ✅ Extracts user ID from token
         private int GetCurrentUserId()
         {
             var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "UserId");

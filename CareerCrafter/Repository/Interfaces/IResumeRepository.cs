@@ -6,7 +6,8 @@ namespace CareerCrafter.Repositories.Interfaces
     {
         Task UploadResumeAsync(Resume resume);
         Task<Resume?> GetLatestResumeByUserIdAsync(int userId);
+        Task<List<Resume>> GetAllResumesByUserIdAsync(int userId);
         Task<Resume?> GetResumeByIdAndUserAsync(int id, int userId);
-        Task DeleteResumeAsync(Resume resume, string wwwRootPath);
+        Task<bool> SoftDeleteResumeAsync(Resume resume);
     }
 }

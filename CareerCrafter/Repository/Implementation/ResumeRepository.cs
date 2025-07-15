@@ -16,60 +16,44 @@ namespace CareerCrafter.Repositories.Implementations
 
         public async Task UploadResumeAsync(Resume resume)
         {
-            try
-            {
-                await _context.Resumes.AddAsync(resume);
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Failed to upload resume.", ex);
-            }
+            await _context.Resumes.AddAsync(resume);
+            await _context.SaveChangesAsync();
         }
 
         public async Task<Resume?> GetLatestResumeByUserIdAsync(int userId)
         {
-            try
-            {
-                return await _context.Resumes
-                    .Where(r => r.UserId == userId)
-                    .OrderByDescending(r => r.UploadedDate)
-                    .FirstOrDefaultAsync();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Failed to retrieve resume.", ex);
-            }
+            return await _context.Resumes
+                .Where(r => r.UserId == userId && !r.IsDeleted)
+                .OrderByDescending(r => r.UploadedDate)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<Resume>> GetAllResumesByUserIdAsync(int userId)
+        {
+            return await _context.Resumes
+                .Where(r => r.UserId == userId && !r.IsDeleted)
+                .OrderByDescending(r => r.UploadedDate)
+                .ToListAsync();
         }
 
         public async Task<Resume?> GetResumeByIdAndUserAsync(int id, int userId)
         {
-            try
-            {
-                return await _context.Resumes
-                    .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Failed to find resume.", ex);
-            }
+            return await _context.Resumes
+                .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId && !r.IsDeleted);
         }
 
-        public async Task DeleteResumeAsync(Resume resume, string wwwRootPath)
+        public async Task<bool> SoftDeleteResumeAsync(Resume resume)
         {
-            try
-            {
-                var fullPath = Path.Combine(wwwRootPath, resume.FilePath.TrimStart('/'));
-                if (File.Exists(fullPath))
-                    File.Delete(fullPath);
+            bool usedInApplications = await _context.Applications
+                .AnyAsync(a => a.ResumeId == resume.Id);
 
-                _context.Resumes.Remove(resume);
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Failed to delete resume.", ex);
-            }
+            if (usedInApplications)
+                return false;
+
+            resume.IsDeleted = true;
+            _context.Resumes.Update(resume);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

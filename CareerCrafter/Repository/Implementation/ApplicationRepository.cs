@@ -32,7 +32,7 @@ namespace CareerCrafter.Repositories.Implementations
             try
             {
                 return await _context.Applications
-                    .AnyAsync(a => a.JobId == jobId && a.JobSeekerId == jobSeekerId);
+                    .AnyAsync(a => a.JobId == jobId && a.JobSeekerId == jobSeekerId && !a.IsDeleted);
             }
             catch (Exception ex)
             {
@@ -65,9 +65,9 @@ namespace CareerCrafter.Repositories.Implementations
 
                 var applicants = await (
                     from a in _context.Applications
-                    where a.JobId == jobId
+                    where a.JobId == jobId && !a.IsDeleted
                     join u in _context.Users on a.JobSeekerId equals u.Id
-                    join r in _context.Resumes on u.Id equals r.UserId into resumeGroup
+                    join r in _context.Resumes on a.ResumeId equals r.Id into resumeGroup
                     from resume in resumeGroup.DefaultIfEmpty()
                     select new ApplicantDto
                     {
@@ -93,7 +93,7 @@ namespace CareerCrafter.Repositories.Implementations
             {
                 return await _context.Applications
                     .Include(a => a.Job)
-                    .FirstOrDefaultAsync(a => a.Id == applicationId && a.Job.EmployerId == employerId);
+                    .FirstOrDefaultAsync(a => a.Id == applicationId && a.Job.EmployerId == employerId && !a.IsDeleted);
             }
             catch (Exception ex)
             {
@@ -106,7 +106,7 @@ namespace CareerCrafter.Repositories.Implementations
             try
             {
                 return await _context.Applications
-                    .FirstOrDefaultAsync(a => a.Id == applicationId && a.JobSeekerId == jobSeekerId);
+                    .FirstOrDefaultAsync(a => a.Id == applicationId && a.JobSeekerId == jobSeekerId && !a.IsDeleted);
             }
             catch (Exception ex)
             {
@@ -131,13 +131,19 @@ namespace CareerCrafter.Repositories.Implementations
         {
             try
             {
-                _context.Applications.Remove(application);
+                application.IsDeleted = true;
+                _context.Applications.Update(application);
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                throw new Exception("Error removing application.", ex);
+                throw new Exception("Error soft-deleting application.", ex);
             }
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
         }
     }
 }

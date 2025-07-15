@@ -37,6 +37,12 @@ namespace CareerCrafter.Data
                 .WithMany()
                 .HasForeignKey(r => r.UserId)
                 .OnDelete(DeleteBehavior.Restrict); // prevents accidental delete of resumes
+
+            modelBuilder.Entity<Application>()
+                .HasOne(a => a.Resume)                     // ✅ NEW
+                .WithMany()
+                .HasForeignKey(a => a.ResumeId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }
